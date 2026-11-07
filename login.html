@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Login — AB Tech</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=3">
+<link rel="icon" type="image/png" sizes="192x192" href="favicon.png?v=3">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=3">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#080002">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="AB Tech">
+<link rel="stylesheet" href="panel.css?v=9">
+<link rel="stylesheet" href="shared.css?v=13">
+<style>
+/* login uses the SAME background as the home page */
+html,body{background:#080002!important}
+.lg-w{background:transparent!important}
+.lg-c{background:rgba(255,255,255,.07)!important;border:1px solid rgba(255,255,255,.16)!important;-webkit-backdrop-filter:blur(22px) saturate(160%);backdrop-filter:blur(22px) saturate(160%)}
+/* loading skeleton on the always-dark login card */
+.lg-c .sq{background:rgba(255,255,255,.08)}.lg-c .sq::after{background:linear-gradient(90deg,transparent,rgba(255,255,255,.13),transparent)}
+/* simple language button */
+#lgb{background:transparent!important;border:0!important;box-shadow:none!important;color:#fff;opacity:.85;padding:8px 10px;border-radius:999px;font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+#lgb:hover{opacity:1;background:rgba(255,255,255,.1)!important}
+</style>
+</head>
+<body>
+<div class="bg-home" aria-hidden="true"></div>
+<div class="shade" aria-hidden="true"></div>
+<button class="gh lgb" id="lgb" aria-label="Language" style="position:fixed;top:14px;inset-inline-end:14px;z-index:5"></button>
+<div class="lg-w"><div class="lg-c" id="box"><div class="sq-on" aria-busy="true"><div class="br" style="padding:0 0 20px"><i class="sq" style="--w:40px;--h:40px;--r:12px"></i><i class="sq" style="--w:90px;--h:18px;--r:8px"></i></div><i class="sq" style="--w:190px;--h:24px;--r:8px"></i><div style="height:8px"></div><i class="sq" style="--w:260px;--h:14px;--r:8px"></i><div class="tabs"><i class="sq" style="--w:100%;--h:40px;--r:9px"></i><i class="sq" style="--w:100%;--h:40px;--r:9px"></i></div><div class="fm"><div style="display:grid;gap:8px"><i class="sq" style="--w:50px;--h:12px;--r:8px"></i><i class="sq" style="--w:100%;--h:46px;--r:10px"></i></div><div style="display:grid;gap:8px"><i class="sq" style="--w:70px;--h:12px;--r:8px"></i><i class="sq" style="--w:100%;--h:46px;--r:10px"></i></div><i class="sq" style="--w:100%;--h:44px;--r:10px; margin-top:6px"></i></div><div style="margin-top:16px"><i class="sq" style="--w:120px;--h:12px;--r:8px"></i></div></div></div></div>
+<script src="panel.js?v=9"></script>
+<script type="module">
+import './fb.js?v=1';
+P.$('#lgb').innerHTML = P.ic('globe', 16) + '<span class="lc"></span>'; P.paintLang(); P.$('#lgb').onclick = P.langMenu; addEventListener('ablang', () => { if (P.$('#f')) form() });
+const box = P.$('#box'); let mode = 'login', pending = null;
+const goTo = a => location.replace(a ? 'admin.html' : 'users.html');
+function head(t, s) { return '<div class="br"><img src="icon-192.png" alt="" onerror="this.style.display=\'none\'"><div>AB Tech</div></div><h2>' + t + '</h2><p class="mu">' + s + '</p>' }
+function form() {
+  const su = mode === 'signup';
+  box.innerHTML = head(su ? 'Create your account' : 'Welcome back', su ? 'Sign up to send requests and follow your projects.' : 'Log in to your AB Tech dashboard.') +
+    '<div class="tabs"><button data-m="login" class="' + (su ? '' : 'on') + '">Login</button><button data-m="signup" class="' + (su ? 'on' : '') + '">Sign up</button></div>' +
+    '<form class="fm" id="f">' + (su ? '<label class="f">Full name<input id="nm" autocomplete="name" required></label>' : '') +
+    '<label class="f">Email<input id="em" type="email" autocomplete="email" required></label><label class="f">Password<input id="pw" type="password" minlength="6" autocomplete="' + (su ? 'new-password' : 'current-password') + '" required></label>' +
+    '<div class="er" id="er"></div><button class="btn" id="go">' + (su ? 'Create account' : 'Login') + '</button></form>' +
+    '<p style="margin-top:16px"><a class="mu" href="index.html?site=1">' + P.ic('back', 14) + ' Back to website</a></p>';
+  if (new URLSearchParams(location.search).get('deleted')) P.$('#er').textContent = 'This account was deleted by the administrator.';
+  P.$$('[data-m]').forEach(b => b.onclick = () => { mode = b.dataset.m; form() });
+  P.$('#f').onsubmit = async e => {
+    e.preventDefault(); const er = P.$('#er'), b = P.$('#go'); er.textContent = ''; b.disabled = true;
+    try {
+      const em = P.$('#em').value.trim().toLowerCase(), pw = P.$('#pw').value;
+      const r = su ? await FB.signup(P.$('#nm').value.trim(), em, pw) : await FB.login(em, pw);
+      if (r.admin) return adminStep(r); goTo(false)
+    } catch (x) { er.textContent = FB.err(x); b.disabled = false }
+  };
+}
+/* admin: one-time code sent by EmailJS to the admin's email */
+async function adminStep(r) {
+  let cfg = null, cfgErr = null; try { cfg = await FB.get('settings/emailjs') } catch (e) { cfgErr = e }
+  const need = cfg && cfg.enabled && cfg.service && cfg.template && cfg.key;
+  const ok = () => { try { sessionStorage.setItem('ab_admin', r.uid) } catch (e) { } goTo(true) };
+  if (!need) {
+    const why = cfgErr ? 'Could not read the EmailJS settings (' + P.esc(FB.err(cfgErr)) + '). Make sure the database rules let admins read settings/emailjs.'
+      : !cfg ? 'EmailJS is not set up yet. Open Admin, then Settings, fill in the Service ID, Template ID and Public key, and turn it on.'
+      : !cfg.enabled ? 'EmailJS is switched off in the admin settings, so no code is sent.'
+      : 'EmailJS settings are incomplete (Service ID, Template ID and Public key are all required), so no code is sent.';
+    box.innerHTML = head('No verification code', why) + '<div class="ft" style="display:flex;gap:10px;margin-top:12px"><button class="btn sec" id="bk">Cancel</button><button class="btn" id="sk">Continue</button></div>';
+    P.$('#bk').onclick = async () => { await FB.logout(); form() }; P.$('#sk').onclick = ok; return
+  }
+  box.innerHTML = head('Verify it is you', 'Sending a 6-digit code to ' + P.esc(r.email) + '...') + '<div class="er" id="er"></div>';
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  try {
+    await FB.set('adminCodes/' + r.uid, { code, exp: Date.now() + 10 * 60000 });
+    await P.mail(cfg, { to_email: r.email, email: r.email, code, passcode: code, time: new Date().toLocaleString(), title: 'Admin login code', name: 'AB Tech', message: 'Your admin login code is ' + code + '. It expires in 10 minutes. If this was not you, ignore this email.' });
+  } catch (x) {
+    box.innerHTML = head('Could not send the code', 'The email service did not answer. Check the EmailJS settings in the panel.') +
+      '<div class="er">' + P.esc(String(x.message || x).slice(0, 160)) + '</div><div class="ft" style="display:flex;gap:10px;margin-top:12px"><button class="btn sec" id="bk">Cancel</button><button class="btn" id="sk">Continue without code</button></div>';
+    P.$('#bk').onclick = async () => { await FB.logout(); form() }; P.$('#sk').onclick = ok; return
+  }
+  box.innerHTML = head('Verify it is you', 'Enter the 6-digit code we sent to ' + P.esc(r.email) + '. It expires in 10 minutes.') +
+    '<form class="fm" id="cf" style="margin-top:14px"><input id="cd" inputmode="numeric" maxlength="6" placeholder="000000" style="text-align:center;font-size:22px;letter-spacing:8px" required><div class="er" id="er"></div><button class="btn" id="go">Verify and continue</button><button type="button" class="btn sec" id="bk">Cancel</button></form>';
+  P.$('#cd').focus(); P.$('#bk').onclick = async () => { await FB.logout(); form() };
+  P.$('#cf').onsubmit = async e => {
+    e.preventDefault(); const er = P.$('#er');
+    try {
+      const s = await FB.get('adminCodes/' + r.uid);
+      if (!s || Date.now() > s.exp) { er.textContent = 'The code expired. Log in again.'; return }
+      if (P.$('#cd').value.trim() !== s.code) { er.textContent = 'Wrong code.'; return }
+      await FB.remove('adminCodes/' + r.uid); ok()
+    } catch (x) { er.textContent = FB.err(x) }
+  }
+}
+if (new URLSearchParams(location.search).get('out')) { await FB.user(); await FB.logout(); history.replaceState(null, '', 'login.html') }
+FB.user().then(u => { if (u && !new URLSearchParams(location.search).get('deleted')) { if (u.role === 'admin' && sessionStorage.getItem('ab_admin') !== u.uid) { adminStep({ uid: u.uid, email: u.email, admin: true }) } else goTo(u.role === 'admin') } else form() });
+</script>
+</body>
+</html>
